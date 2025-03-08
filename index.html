@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <!-- 添加 viewport meta 标签，确保在移动设备上显示正常 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>学习记录与复习计划系统</title>
+  <!-- 引入 Bootstrap CSS -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { padding-top: 20px; }
+    .pointer { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 class="mb-4 text-center">学习记录与复习计划系统</h1>
+
+    <!-- 新增学习记录表单 -->
+    <div class="card mb-4">
+      <div class="card-header">新增学习记录</div>
+      <div class="card-body">
+        <form id="recordForm">
+          <div class="mb-3">
+            <label for="contentInput" class="form-label">学习内容名称</label>
+            <input type="text" id="contentInput" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="dateInput" class="form-label">学习日期</label>
+            <input type="date" id="dateInput" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label for="fileInput" class="form-label">上传附件（txt、图片）</label>
+            <input type="file" id="fileInput" class="form-control" accept=".txt,image/*" multiple>
+          </div>
+          <button type="submit" class="btn btn-primary">确定</button>
+          <button type="reset" class="btn btn-secondary">重置</button>
+          <!-- 隐藏字段，用于编辑时保存记录ID -->
+          <input type="hidden" id="recordId">
+        </form>
+      </div>
+    </div>
+
+    <!-- 今日复习计划 -->
+    <div class="card mb-4">
+      <div class="card-header">今日复习计划 (<span id="todayDate"></span>)</div>
+      <div class="card-body" id="todayReviewList">
+        <!-- 动态填充今日复习内容 -->
+      </div>
+    </div>
+
+    <!-- 学习记录列表 -->
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>已学习内容清单</span>
+        <button class="btn btn-sm btn-outline-secondary" id="toggleRecordsBtn">隐藏</button>
+      </div>
+      <div class="card-body" id="recordList">
+        <table class="table table-bordered">
+          <thead>
+            <tr>
+              <th>学习内容</th>
+              <th>学习日期</th>
+              <th>复习计划</th>
+              <th>附件</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="recordsTableBody">
+            <!-- 记录项 -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 数据导出/导入 -->
+    <div class="card mb-4">
+      <div class="card-header">数据备份</div>
+      <div class="card-body">
+        <button class="btn btn-info me-2" id="exportBtn">导出数据</button>
+        <input type="file" id="importInput" accept=".json" style="display: none;">
+        <button class="btn btn-info" id="importBtn">导入数据</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 引入 Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <!-- 主逻辑代码 -->
+  <script>
+    // 全局变量：存储学习记录
+    let records = [];
+
+    // 定义固定的复习间隔（单位：天）
+    const reviewIntervals = [1, 3, 7, 14, 30, 60, 120, 300, 600];
+
+    // 初始化：加载 localStorage 数据
+    function loadRecords() {
+      const data = localStorage.getItem('studyRecords');
+      if (data) {
+        records = JSON.parse(data);
+      }
+    }
+
+    function saveRecords() {
+      localStorage.setItem('studyRecords', JSON.stringify(records));
+    }
+
+    // 生成复习计划
+    function generateReviewPlan(learningDateStr) {
+      const plan = [];
+      const baseDate = new Date(learningDateStr);
+      reviewIntervals.forEach(interval => {
+        const reviewDate = new Date(baseDate);
+        reviewDate.setDate(reviewDate.getDate() + interval);
+        plan.push({
+          reviewDate: reviewDate.toISOString().slice(0, 10),
+          completed: false
+        });
+      });
+      return plan;
+    }
+
+    // 渲染今日复习计划
+    function renderTodayReviews() {
+      const today = new Date().toISOString().slice(0, 10);
+      document.getElementById('todayDate').textContent = today;
+      const container = document.getElementById('todayReviewList');
+      container.innerHTML = '';
+      records.forEach(record => {
+        record.reviewPlan.forEach((review) => {
+          if (review.reviewDate === today) {
+            const div = document.createElement('div');
+            div.className = 'form-check mb-2';
+            const checkbox = document.createElement('input');
+            checkbox.className = 'form-check-input';
+            checkbox.type = 'checkbox';
+            checkbox.checked = review.completed;
+            checkbox.addEventListener('change', function () {
+              review.completed = this.checked;
+              saveRecords();
+              renderRecords();
+            });
+            const label = document.createElement('label');
+            label.className = 'form-check-label';
+            label.textContent = record.content + '（学习日期：' + record.learningDate + '）';
+            div.appendChild(checkbox);
+            div.appendChild(label);
+            container.appendChild(div);
+          }
+        });
+      });
+    }
+
+    // 渲染所有记录
+    function renderRecords() {
+      const tbody = document.getElementById('recordsTableBody');
+      tbody.innerHTML = '';
+      records.forEach(record => {
+        const tr = document.createElement('tr');
+        // 学习内容
+        tr.appendChild(createTd(record.content));
+        // 学习日期
+        tr.appendChild(createTd(record.learningDate));
+        // 复习计划（折叠显示）
+        const tdPlan = document.createElement('td');
+        // 创建折叠按钮
+        const collapseId = "collapsePlan-" + record.id;
+        const toggleButton = document.createElement('button');
+        toggleButton.className = 'btn btn-sm btn-link';
+        toggleButton.setAttribute("data-bs-toggle", "collapse");
+        toggleButton.setAttribute("data-bs-target", "#" + collapseId);
+        toggleButton.textContent = "显示复习计划";
+        tdPlan.appendChild(toggleButton);
+        // 创建折叠内容容器
+        const collapseDiv = document.createElement('div');
+        collapseDiv.className = 'collapse mt-2';
+        collapseDiv.id = collapseId;
+        record.reviewPlan.forEach(r => {
+          const p = document.createElement('p');
+          p.className = 'mb-1';
+          p.textContent = r.reviewDate + (r.completed ? ' ✓' : '');
+          collapseDiv.appendChild(p);
+        });
+        // 根据折叠状态更新按钮文字
+        collapseDiv.addEventListener('shown.bs.collapse', function() {
+          toggleButton.textContent = "隐藏复习计划";
+        });
+        collapseDiv.addEventListener('hidden.bs.collapse', function() {
+          toggleButton.textContent = "显示复习计划";
+        });
+        tdPlan.appendChild(collapseDiv);
+        tr.appendChild(tdPlan);
+        // 附件
+        const tdFiles = document.createElement('td');
+        if (record.attachments && record.attachments.length > 0) {
+          record.attachments.forEach(file => {
+            if (file.type.startsWith('image/')) {
+              const img = document.createElement('img');
+              img.src = file.data;
+              img.alt = file.name;
+              img.style.maxWidth = '100px';
+              img.style.cursor = 'pointer';
+              img.addEventListener('click', () => window.open(file.data, '_blank'));
+              tdFiles.appendChild(img);
+            } else if (file.type === 'text/plain') {
+              const a = document.createElement('a');
+              a.href = file.data;
+              a.target = '_blank';
+              a.textContent = file.name;
+              tdFiles.appendChild(a);
+            } else {
+              const a = document.createElement('a');
+              a.href = file.data;
+              a.download = file.name;
+              a.textContent = file.name;
+              tdFiles.appendChild(a);
+            }
+            tdFiles.appendChild(document.createElement('br'));
+          });
+        }
+        tr.appendChild(tdFiles);
+        // 操作
+        const tdActions = document.createElement('td');
+        const editBtn = document.createElement('button');
+        editBtn.className = 'btn btn-sm btn-warning me-2';
+        editBtn.textContent = '编辑';
+        editBtn.addEventListener('click', () => fillFormForEdit(record));
+        tdActions.appendChild(editBtn);
+        const delBtn = document.createElement('button');
+        delBtn.className = 'btn btn-sm btn-danger';
+        delBtn.textContent = '删除';
+        delBtn.addEventListener('click', () => {
+          if (confirm('确定删除该记录吗？')) {
+            records = records.filter(r => r.id !== record.id);
+            saveRecords();
+            renderRecords();
+            renderTodayReviews();
+          }
+        });
+        tdActions.appendChild(delBtn);
+        tr.appendChild(tdActions);
+        tbody.appendChild(tr);
+      });
+    }
+
+    // 创建单元格辅助函数
+    function createTd(text) {
+      const td = document.createElement('td');
+      td.textContent = text;
+      return td;
+    }
+
+    // 填充表单用于编辑
+    function fillFormForEdit(record) {
+      document.getElementById('contentInput').value = record.content;
+      document.getElementById('dateInput').value = record.learningDate;
+      document.getElementById('recordId').value = record.id;
+    }
+
+    // 处理表单提交
+    document.getElementById('recordForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      const content = document.getElementById('contentInput').value.trim();
+      const learningDate = document.getElementById('dateInput').value;
+      if (!content || !learningDate) {
+        alert('请填写所有字段！');
+        return;
+      }
+      const recordId = document.getElementById('recordId').value;
+      if (recordId) {
+        const rec = records.find(r => r.id === recordId);
+        if (rec) {
+          rec.content = content;
+          rec.learningDate = learningDate;
+          rec.reviewPlan = generateReviewPlan(learningDate);
+        }
+      } else {
+        const newRecord = {
+          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+          content: content,
+          learningDate: learningDate,
+          attachments: [],
+          reviewPlan: generateReviewPlan(learningDate)
+        };
+        records.push(newRecord);
+        const files = document.getElementById('fileInput').files;
+        if (files.length > 0) {
+          Array.from(files).forEach(file => {
+            const reader = new FileReader();
+            reader.onload = function (event) {
+              newRecord.attachments.push({
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                name: file.name,
+                type: file.type,
+                data: event.target.result
+              });
+              saveRecords();
+              renderRecords();
+            };
+            reader.readAsDataURL(file);
+          });
+        }
+      }
+      saveRecords();
+      renderRecords();
+      renderTodayReviews();
+      this.reset();
+      document.getElementById('recordId').value = '';
+    });
+
+    // 初始化日期输入框
+    function initDateInput() {
+      const today = new Date().toISOString().slice(0, 10);
+      const dateInput = document.getElementById('dateInput');
+      dateInput.value = today;
+      dateInput.max = today;
+    }
+
+    // 切换记录列表显示
+    document.getElementById('toggleRecordsBtn').addEventListener('click', function () {
+      const recordListDiv = document.getElementById('recordList');
+      if (recordListDiv.style.display === 'none') {
+        recordListDiv.style.display = 'block';
+        this.textContent = '隐藏';
+      } else {
+        recordListDiv.style.display = 'none';
+        this.textContent = '显示';
+      }
+    });
+
+    // 导出数据
+    document.getElementById('exportBtn').addEventListener('click', function () {
+      const dataStr = JSON.stringify(records);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'studyRecords.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+
+    // 导入数据
+    document.getElementById('importBtn').addEventListener('click', function () {
+      document.getElementById('importInput').click();
+    });
+    document.getElementById('importInput').addEventListener('change', function () {
+      const file = this.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (event) {
+          try {
+            records = JSON.parse(event.target.result);
+            saveRecords();
+            renderRecords();
+            renderTodayReviews();
+            alert("导入成功！");
+          } catch (e) {
+            alert("导入失败，请检查文件格式。");
+          }
+        };
+        reader.readAsText(file);
+      }
+    });
+
+    // 初始化
+    window.addEventListener('load', function () {
+      initDateInput();
+      loadRecords();
+      renderRecords();
+      renderTodayReviews();
+    });
+  </script>
+</body>
+</html>
