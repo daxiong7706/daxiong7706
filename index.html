@@ -2,10 +2,8 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <!-- 添加 viewport meta 标签，确保在移动设备上显示正常 -->
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>学习记录与复习计划系统</title>
-  <!-- 引入 Bootstrap CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
   <style>
     body { padding-top: 20px; }
@@ -35,7 +33,6 @@
           </div>
           <button type="submit" class="btn btn-primary">确定</button>
           <button type="reset" class="btn btn-secondary">重置</button>
-          <!-- 隐藏字段，用于编辑时保存记录ID -->
           <input type="hidden" id="recordId">
         </form>
       </div>
@@ -86,44 +83,31 @@
     </div>
   </div>
 
-  <!-- 引入 Bootstrap JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <!-- 主逻辑代码 -->
   <script>
-    // 全局变量：存储学习记录
     let records = [];
-
-    // 定义固定的复习间隔（单位：天）
     const reviewIntervals = [1, 3, 7, 14, 30, 60, 120, 300, 600];
 
-    // 初始化：加载 localStorage 数据
     function loadRecords() {
       const data = localStorage.getItem('studyRecords');
-      if (data) {
-        records = JSON.parse(data);
-      }
+      if (data) records = JSON.parse(data);
     }
 
     function saveRecords() {
       localStorage.setItem('studyRecords', JSON.stringify(records));
     }
 
-    // 生成复习计划
     function generateReviewPlan(learningDateStr) {
       const plan = [];
       const baseDate = new Date(learningDateStr);
       reviewIntervals.forEach(interval => {
         const reviewDate = new Date(baseDate);
         reviewDate.setDate(reviewDate.getDate() + interval);
-        plan.push({
-          reviewDate: reviewDate.toISOString().slice(0, 10),
-          completed: false
-        });
+        plan.push({ reviewDate: reviewDate.toISOString().slice(0, 10), completed: false });
       });
       return plan;
     }
 
-    // 渲染今日复习计划
     function renderTodayReviews() {
       const today = new Date().toISOString().slice(0, 10);
       document.getElementById('todayDate').textContent = today;
@@ -149,16 +133,16 @@
             div.appendChild(checkbox);
             div.appendChild(label);
 
-            // 如果该记录有txt附件，则添加链接（并修正编码问题）
-            if(record.attachments && record.attachments.length > 0) {
+            if (record.attachments && record.attachments.length > 0) {
               record.attachments.forEach(file => {
-                if(file.type === 'text/plain') {
+                if (file.type === 'text/plain') {
                   const a = document.createElement('a');
-                  // 修改 data URL，添加 charset=utf-8
-                  a.href = file.data.replace("data:text/plain;", "data:text/plain;charset=utf-8;");
-                  a.target = '_blank';
+                  a.href = '#';
                   a.textContent = " [附件:" + file.name + "]";
-                  // 添加一些间隔
+                  a.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    showTextFileContent(file);
+                  });
                   div.appendChild(document.createTextNode(" "));
                   div.appendChild(a);
                 }
@@ -170,19 +154,14 @@
       });
     }
 
-    // 渲染所有记录
     function renderRecords() {
       const tbody = document.getElementById('recordsTableBody');
       tbody.innerHTML = '';
       records.forEach(record => {
         const tr = document.createElement('tr');
-        // 学习内容
         tr.appendChild(createTd(record.content));
-        // 学习日期
         tr.appendChild(createTd(record.learningDate));
-        // 复习计划（折叠显示）
         const tdPlan = document.createElement('td');
-        // 创建折叠按钮
         const collapseId = "collapsePlan-" + record.id;
         const toggleButton = document.createElement('button');
         toggleButton.className = 'btn btn-sm btn-link';
@@ -190,7 +169,6 @@
         toggleButton.setAttribute("data-bs-target", "#" + collapseId);
         toggleButton.textContent = "显示复习计划";
         tdPlan.appendChild(toggleButton);
-        // 创建折叠内容容器
         const collapseDiv = document.createElement('div');
         collapseDiv.className = 'collapse mt-2';
         collapseDiv.id = collapseId;
@@ -200,16 +178,11 @@
           p.textContent = r.reviewDate + (r.completed ? ' ✓' : '');
           collapseDiv.appendChild(p);
         });
-        // 根据折叠状态更新按钮文字
-        collapseDiv.addEventListener('shown.bs.collapse', function() {
-          toggleButton.textContent = "隐藏复习计划";
-        });
-        collapseDiv.addEventListener('hidden.bs.collapse', function() {
-          toggleButton.textContent = "显示复习计划";
-        });
+        collapseDiv.addEventListener('shown.bs.collapse', () => toggleButton.textContent = "隐藏复习计划");
+        collapseDiv.addEventListener('hidden.bs.collapse', () => toggleButton.textContent = "显示复习计划");
         tdPlan.appendChild(collapseDiv);
         tr.appendChild(tdPlan);
-        // 附件
+
         const tdFiles = document.createElement('td');
         if (record.attachments && record.attachments.length > 0) {
           record.attachments.forEach(file => {
@@ -223,10 +196,12 @@
               tdFiles.appendChild(img);
             } else if (file.type === 'text/plain') {
               const a = document.createElement('a');
-              // 同样修正文本附件编码问题
-              a.href = file.data.replace("data:text/plain;", "data:text/plain;charset=utf-8;");
-              a.target = '_blank';
+              a.href = '#';
               a.textContent = file.name;
+              a.addEventListener('click', function(event) {
+                event.preventDefault();
+                showTextFileContent(file);
+              });
               tdFiles.appendChild(a);
             } else {
               const a = document.createElement('a');
@@ -239,7 +214,7 @@
           });
         }
         tr.appendChild(tdFiles);
-        // 操作
+
         const tdActions = document.createElement('td');
         const editBtn = document.createElement('button');
         editBtn.className = 'btn btn-sm btn-warning me-2';
@@ -263,21 +238,31 @@
       });
     }
 
-    // 创建单元格辅助函数
     function createTd(text) {
       const td = document.createElement('td');
       td.textContent = text;
       return td;
     }
 
-    // 填充表单用于编辑
     function fillFormForEdit(record) {
       document.getElementById('contentInput').value = record.content;
       document.getElementById('dateInput').value = record.learningDate;
       document.getElementById('recordId').value = record.id;
     }
 
-    // 处理表单提交
+    function showTextFileContent(file) {
+      const base64Data = file.data.split(',')[1];
+      const binaryString = atob(base64Data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      const text = new TextDecoder('utf-8').decode(bytes);
+      const newWindow = window.open('', '_blank');
+      newWindow.document.write('<pre>' + text + '</pre>');
+      newWindow.document.close();
+    }
+
     document.getElementById('recordForm').addEventListener('submit', function (e) {
       e.preventDefault();
       const content = document.getElementById('contentInput').value.trim();
@@ -328,7 +313,6 @@
       document.getElementById('recordId').value = '';
     });
 
-    // 初始化日期输入框
     function initDateInput() {
       const today = new Date().toISOString().slice(0, 10);
       const dateInput = document.getElementById('dateInput');
@@ -336,7 +320,6 @@
       dateInput.max = today;
     }
 
-    // 切换记录列表显示
     document.getElementById('toggleRecordsBtn').addEventListener('click', function () {
       const recordListDiv = document.getElementById('recordList');
       if (recordListDiv.style.display === 'none') {
@@ -348,7 +331,6 @@
       }
     });
 
-    // 导出数据
     document.getElementById('exportBtn').addEventListener('click', function () {
       const dataStr = JSON.stringify(records);
       const blob = new Blob([dataStr], { type: "application/json" });
@@ -360,7 +342,6 @@
       URL.revokeObjectURL(url);
     });
 
-    // 导入数据
     document.getElementById('importBtn').addEventListener('click', function () {
       document.getElementById('importInput').click();
     });
@@ -383,16 +364,14 @@
       }
     });
 
-    // 每分钟检测日期变化，跨天后更新“今日复习计划”
     function updateTodayDate() {
       const newToday = new Date().toISOString().slice(0, 10);
       if (document.getElementById('todayDate').textContent !== newToday) {
         renderTodayReviews();
       }
     }
-    setInterval(updateTodayDate, 60000); // 每分钟检测一次
+    setInterval(updateTodayDate, 60000);
 
-    // 初始化
     window.addEventListener('load', function () {
       initDateInput();
       loadRecords();
