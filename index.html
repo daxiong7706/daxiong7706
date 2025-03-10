@@ -2,110 +2,30 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>学习记录与复习计划系统</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-  <style>
-    body { padding-top: 20px; }
-    .pointer { cursor: pointer; }
-  </style>
+  <title>复习计划</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-  <div class="container">
-    <h1 class="mb-4 text-center">学习记录与复习计划系统</h1>
-
-    <!-- 新增学习记录表单 -->
-    <div class="card mb-4">
-      <div class="card-header">新增学习记录</div>
-      <div class="card-body">
-        <form id="recordForm">
-          <div class="mb-3">
-            <label for="contentInput" class="form-label">学习内容名称</label>
-            <input type="text" id="contentInput" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label for="dateInput" class="form-label">学习日期</label>
-            <input type="date" id="dateInput" class="form-control" required>
-          </div>
-          <div class="mb-3">
-            <label for="fileInput" class="form-label">上传附件（txt、图片）</label>
-            <input type="file" id="fileInput" class="form-control" accept=".txt,image/*" multiple>
-          </div>
-          <button type="submit" class="btn btn-primary">确定</button>
-          <button type="reset" class="btn btn-secondary">重置</button>
-          <input type="hidden" id="recordId">
-        </form>
-      </div>
-    </div>
-
-    <!-- 今日复习计划 -->
-    <div class="card mb-4">
-      <div class="card-header">
-        今日复习计划 (<span id="todayDate"></span>)
-      </div>
-      <div class="card-body" id="todayReviewList">
-        <!-- 动态填充今日复习内容 -->
-      </div>
-    </div>
-
-    <!-- 学习记录列表 -->
-    <div class="card mb-4">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>已学习内容清单</span>
-        <button class="btn btn-sm btn-outline-secondary" id="toggleRecordsBtn">隐藏</button>
-      </div>
-      <div class="card-body" id="recordList">
-        <table class="table table-bordered">
-          <thead>
-            <tr>
-              <th>学习内容</th>
-              <th>学习日期</th>
-              <th>复习计划</th>
-              <th>附件</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody id="recordsTableBody">
-            <!-- 记录项 -->
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- 数据导出/导入 -->
-    <div class="card mb-4">
-      <div class="card-header">数据备份</div>
-      <div class="card-body">
-        <button class="btn btn-info me-2" id="exportBtn">导出数据</button>
-        <input type="file" id="importInput" accept=".json" style="display: none;">
-        <button class="btn btn-info" id="importBtn">导入数据</button>
-      </div>
-    </div>
+  <div class="container mt-4">
+    <h3>今日复习计划 - <span id="todayDate"></span></h3>
+    <div id="todayReviewList"></div>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   <script>
-    let records = [];
-    const reviewIntervals = [1, 3, 7, 14, 30, 60, 120, 300, 600];
-
-    function loadRecords() {
-      const data = localStorage.getItem('studyRecords');
-      if (data) records = JSON.parse(data);
-    }
+    let records = [
+      {
+        content: "学习JS",
+        learningDate: "2023-10-01",
+        reviewPlan: [{ reviewDate: new Date().toISOString().slice(0, 10), completed: false }],
+        attachments: [
+          { name: "demo.jpg", type: "image/jpeg", data: "data:image/jpeg;base64,/9j/4AAQSkZJRg..." },
+          { name: "note.txt", type: "text/plain", data: "data:text/plain;base64,SGVsbG8gV29ybGQ=" }
+        ]
+      }
+    ];
 
     function saveRecords() {
-      localStorage.setItem('studyRecords', JSON.stringify(records));
-    }
-
-    function generateReviewPlan(learningDateStr) {
-      const plan = [];
-      const baseDate = new Date(learningDateStr);
-      reviewIntervals.forEach(interval => {
-        const reviewDate = new Date(baseDate);
-        reviewDate.setDate(reviewDate.getDate() + interval);
-        plan.push({ reviewDate: reviewDate.toISOString().slice(0, 10), completed: false });
-      });
-      return plan;
+      localStorage.setItem('records', JSON.stringify(records));
     }
 
     function renderTodayReviews() {
@@ -125,7 +45,6 @@
             checkbox.addEventListener('change', function () {
               review.completed = this.checked;
               saveRecords();
-              renderRecords();
             });
             const label = document.createElement('label');
             label.className = 'form-check-label';
@@ -134,120 +53,35 @@
             div.appendChild(label);
 
             if (record.attachments && record.attachments.length > 0) {
+              const attachmentsSpan = document.createElement('span');
+              attachmentsSpan.className = 'ms-2';
               record.attachments.forEach(file => {
-                if (file.type === 'text/plain') {
-                  const a = document.createElement('a');
-                  a.href = '#';
-                  a.textContent = " [附件:" + file.name + "]";
+                const a = document.createElement('a');
+                a.href = '#';
+                a.className = 'me-2';
+                a.textContent = `[${file.name}]`;
+                if (file.type.startsWith('image/')) {
+                  a.addEventListener('click', function(event) {
+                    event.preventDefault();
+                    window.open(file.data, '_blank');
+                  });
+                } else if (file.type === 'text/plain') {
                   a.addEventListener('click', function(event) {
                     event.preventDefault();
                     showTextFileContent(file);
                   });
-                  div.appendChild(document.createTextNode(" "));
-                  div.appendChild(a);
+                } else {
+                  a.href = file.data;
+                  a.download = file.name;
                 }
+                attachmentsSpan.appendChild(a);
               });
+              div.appendChild(attachmentsSpan);
             }
             container.appendChild(div);
           }
         });
       });
-    }
-
-    function renderRecords() {
-      const tbody = document.getElementById('recordsTableBody');
-      tbody.innerHTML = '';
-      records.forEach(record => {
-        const tr = document.createElement('tr');
-        tr.appendChild(createTd(record.content));
-        tr.appendChild(createTd(record.learningDate));
-        const tdPlan = document.createElement('td');
-        const collapseId = "collapsePlan-" + record.id;
-        const toggleButton = document.createElement('button');
-        toggleButton.className = 'btn btn-sm btn-link';
-        toggleButton.setAttribute("data-bs-toggle", "collapse");
-        toggleButton.setAttribute("data-bs-target", "#" + collapseId);
-        toggleButton.textContent = "显示复习计划";
-        tdPlan.appendChild(toggleButton);
-        const collapseDiv = document.createElement('div');
-        collapseDiv.className = 'collapse mt-2';
-        collapseDiv.id = collapseId;
-        record.reviewPlan.forEach(r => {
-          const p = document.createElement('p');
-          p.className = 'mb-1';
-          p.textContent = r.reviewDate + (r.completed ? ' ✓' : '');
-          collapseDiv.appendChild(p);
-        });
-        collapseDiv.addEventListener('shown.bs.collapse', () => toggleButton.textContent = "隐藏复习计划");
-        collapseDiv.addEventListener('hidden.bs.collapse', () => toggleButton.textContent = "显示复习计划");
-        tdPlan.appendChild(collapseDiv);
-        tr.appendChild(tdPlan);
-
-        const tdFiles = document.createElement('td');
-        if (record.attachments && record.attachments.length > 0) {
-          record.attachments.forEach(file => {
-            if (file.type.startsWith('image/')) {
-              const img = document.createElement('img');
-              img.src = file.data;
-              img.alt = file.name;
-              img.style.maxWidth = '100px';
-              img.style.cursor = 'pointer';
-              img.addEventListener('click', () => window.open(file.data, '_blank'));
-              tdFiles.appendChild(img);
-            } else if (file.type === 'text/plain') {
-              const a = document.createElement('a');
-              a.href = '#';
-              a.textContent = file.name;
-              a.addEventListener('click', function(event) {
-                event.preventDefault();
-                showTextFileContent(file);
-              });
-              tdFiles.appendChild(a);
-            } else {
-              const a = document.createElement('a');
-              a.href = file.data;
-              a.download = file.name;
-              a.textContent = file.name;
-              tdFiles.appendChild(a);
-            }
-            tdFiles.appendChild(document.createElement('br'));
-          });
-        }
-        tr.appendChild(tdFiles);
-
-        const tdActions = document.createElement('td');
-        const editBtn = document.createElement('button');
-        editBtn.className = 'btn btn-sm btn-warning me-2';
-        editBtn.textContent = '编辑';
-        editBtn.addEventListener('click', () => fillFormForEdit(record));
-        tdActions.appendChild(editBtn);
-        const delBtn = document.createElement('button');
-        delBtn.className = 'btn btn-sm btn-danger';
-        delBtn.textContent = '删除';
-        delBtn.addEventListener('click', () => {
-          if (confirm('确定删除该记录吗？')) {
-            records = records.filter(r => r.id !== record.id);
-            saveRecords();
-            renderRecords();
-            renderTodayReviews();
-          }
-        });
-        tdActions.appendChild(delBtn);
-        tr.appendChild(tdActions);
-        tbody.appendChild(tr);
-      });
-    }
-
-    function createTd(text) {
-      const td = document.createElement('td');
-      td.textContent = text;
-      return td;
-    }
-
-    function fillFormForEdit(record) {
-      document.getElementById('contentInput').value = record.content;
-      document.getElementById('dateInput').value = record.learningDate;
-      document.getElementById('recordId').value = record.id;
     }
 
     function showTextFileContent(file) {
@@ -263,121 +97,8 @@
       newWindow.document.close();
     }
 
-    document.getElementById('recordForm').addEventListener('submit', function (e) {
-      e.preventDefault();
-      const content = document.getElementById('contentInput').value.trim();
-      const learningDate = document.getElementById('dateInput').value;
-      if (!content || !learningDate) {
-        alert('请填写所有字段！');
-        return;
-      }
-      const recordId = document.getElementById('recordId').value;
-      if (recordId) {
-        const rec = records.find(r => r.id === recordId);
-        if (rec) {
-          rec.content = content;
-          rec.learningDate = learningDate;
-          rec.reviewPlan = generateReviewPlan(learningDate);
-        }
-      } else {
-        const newRecord = {
-          id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-          content: content,
-          learningDate: learningDate,
-          attachments: [],
-          reviewPlan: generateReviewPlan(learningDate)
-        };
-        records.push(newRecord);
-        const files = document.getElementById('fileInput').files;
-        if (files.length > 0) {
-          Array.from(files).forEach(file => {
-            const reader = new FileReader();
-            reader.onload = function (event) {
-              newRecord.attachments.push({
-                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
-                name: file.name,
-                type: file.type,
-                data: event.target.result
-              });
-              saveRecords();
-              renderRecords();
-            };
-            reader.readAsDataURL(file);
-          });
-        }
-      }
-      saveRecords();
-      renderRecords();
-      renderTodayReviews();
-      this.reset();
-      document.getElementById('recordId').value = '';
-    });
-
-    function initDateInput() {
-      const today = new Date().toISOString().slice(0, 10);
-      const dateInput = document.getElementById('dateInput');
-      dateInput.value = today;
-      dateInput.max = today;
-    }
-
-    document.getElementById('toggleRecordsBtn').addEventListener('click', function () {
-      const recordListDiv = document.getElementById('recordList');
-      if (recordListDiv.style.display === 'none') {
-        recordListDiv.style.display = 'block';
-        this.textContent = '隐藏';
-      } else {
-        recordListDiv.style.display = 'none';
-        this.textContent = '显示';
-      }
-    });
-
-    document.getElementById('exportBtn').addEventListener('click', function () {
-      const dataStr = JSON.stringify(records);
-      const blob = new Blob([dataStr], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'studyRecords.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    });
-
-    document.getElementById('importBtn').addEventListener('click', function () {
-      document.getElementById('importInput').click();
-    });
-    document.getElementById('importInput').addEventListener('change', function () {
-      const file = this.files[0];
-      if (file) {
-        const reader = new FileReader();
-        reader.onload = function (event) {
-          try {
-            records = JSON.parse(event.target.result);
-            saveRecords();
-            renderRecords();
-            renderTodayReviews();
-            alert("导入成功！");
-          } catch (e) {
-            alert("导入失败，请检查文件格式。");
-          }
-        };
-        reader.readAsText(file);
-      }
-    });
-
-    function updateTodayDate() {
-      const newToday = new Date().toISOString().slice(0, 10);
-      if (document.getElementById('todayDate').textContent !== newToday) {
-        renderTodayReviews();
-      }
-    }
-    setInterval(updateTodayDate, 60000);
-
-    window.addEventListener('load', function () {
-      initDateInput();
-      loadRecords();
-      renderRecords();
-      renderTodayReviews();
-    });
+    // 初始化
+    renderTodayReviews();
   </script>
 </body>
 </html>
